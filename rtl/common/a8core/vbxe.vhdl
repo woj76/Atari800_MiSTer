@@ -1,5 +1,5 @@
 --------------------------------------------------------------------------
--- (c) 2025 Wojciech Mostowski, firstname.lastname at gmail.com
+-- (c) 2026 Wojciech Mostowski, firstname.lastname at gmail.com
 --
 -- The main part of VBXE: memory DMA, MEMAC, XDL processing, image output.
 --
@@ -25,7 +25,8 @@ use IEEE.STD_LOGIC_MISC.ALL;
 entity VBXE is
 generic ( 
 	cycle_length : integer := 16; -- Currently unused, but leave just in case
-	atmap_bram : boolean := true
+	atmap_bram : boolean := true;
+	palette_path : string := "rtl/vbxe/"
 );
 port (
 	clk : in std_logic;
@@ -664,7 +665,7 @@ cb_data_in <= VBXE_UPLOAD_PALETTE_COLOR when VBXE_UPLOAD_PALETTE_RGB(2) = '1' el
 color_index_out <= (palette_get_index & palette_get_color);
 
 colors0_r: entity work.dpram
-generic map(10,7,"rtl/vbxe/pal_r.mif")
+generic map(10,7,palette_path&"pal_r.mif")
 port map
 (
 	clock => clk,
@@ -676,7 +677,7 @@ port map
 );
 
 colors0_g: entity work.dpram
-generic map(10,7,"rtl/vbxe/pal_g.mif")
+generic map(10,7,palette_path&"pal_g.mif")
 port map
 (
 	clock => clk,
@@ -688,7 +689,7 @@ port map
 );
 
 colors0_b: entity work.dpram
-generic map(10,7,"rtl/vbxe/pal_b.mif")
+generic map(10,7,palette_path&"pal_b.mif")
 port map
 (
 	clock => clk,
