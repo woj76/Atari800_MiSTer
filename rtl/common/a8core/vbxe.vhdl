@@ -1622,7 +1622,7 @@ begin
 			end if;
 		else
 			if xdl_vdelay_reg = 1 then
-				xdl_active_next <= xdl_enabled_reg;
+				-- xdl_active_next <= xdl_enabled_reg;
 				xdl_rptl_next <= x"00";
 				xdl_fetch_next <= xdl_addr_reg;
 				xdl_ovscr_h_next <= "000";
