@@ -382,7 +382,7 @@ process(gtia_pf0,gtia_pf1,gtia_pf2,gtia_pf3,gtia_highres,gtia_active_hr,gtia_pri
 	xdl_ov_pal_reg,xdl_pf_pal_reg,xdl_gp_reg,xdl_ov_text_reg,xdl_pixels_reg,xdl_ptrans_reg,xdl_pixel_sindex_reg,
 	p0_reg,p1_reg,p2_reg,p3_reg,xdl_map_buffer_index_reg,coldetect_reg,colclear,gtia_hpos,xdl_map_active_reg,
 	xdl_mapscr_h_reg,xdl_ov_active_reg,xdl_ovscr_h_reg,video_clock_antic_highres,xdl_ov_live_reg,
-	colmask_reg,no_trans_reg,trans15_reg,video_clock_vbxe,video_clock_antic_lowres,gtia_palette_reg,xcolor_reg,xcolor2_reg,ver_127)
+	colmask_reg,no_trans_reg,trans15_reg,video_clock_vbxe,video_clock_antic_lowres,xcolor_reg,xcolor2_reg,ver_127)
 	variable ov_prior : std_logic_vector(7 downto 0);
 	variable flip_23 : boolean;
 	variable flip_21 : boolean;
@@ -396,8 +396,8 @@ begin
 	map_pf0 <= gtia_pf0;
 	map_pf1 <= gtia_pf1;
 	map_pf2 <= gtia_pf2;
-	xdl_pf_palette <= gtia_palette_reg;
-	xdl_ov_palette <= "00";
+	xdl_pf_palette <= xdl_pf_pal_reg;
+	xdl_ov_palette <= xdl_ov_pal_reg;
 	xdl_ov_pixel <= (others => '0');
 	xdl_ov_pixel_active <= '0';
 	gtia_prior_mod <= gtia_prior_raw;
@@ -410,8 +410,6 @@ begin
 		coldetect_next <= (others => '0');
 	end if;
 	if (xdl_active_reg = '1') and (enable = '1') then
-		xdl_pf_palette <= xdl_pf_pal_reg;
-		xdl_ov_palette <= xdl_ov_pal_reg;
 		ov_prior := xdl_gp_reg;
 		if (gtia_hpos = x"10") then -- arbitrary, as long as it's before anything gets displayed
 			if (xdl_map_active_reg = '1') then
@@ -825,8 +823,6 @@ begin
 			memb_next(7 downto 6) <= "00";
 			blitter_irqen_next <= '0';
 			blitter_request <= "00";
-			colclear <= '1';
-			colmask_next <= (others => '0');
 			if gtia_pfeat_reg = '0' then
 				gtia_palette_next <= "00";
 				xcolor_next <= '0';
@@ -884,19 +880,10 @@ process(clk)
 begin
 	if rising_edge(clk) then
 		if (reset_n = '0') then
-			csel_reg <= (others => 'U');
-			psel_reg <= (others => 'U');
-			cr_reg <= (others => 'U');
-			cg_reg <= (others => 'U');
-			cb_reg <= (others => 'U');
 			cb_request_reg <= '0';
-			p0_reg <= (others => '0');
-			p1_reg <= (others => '0');
-			p2_reg <= (others => '0');
-			p3_reg <= (others => '0');
-			memc_reg <= "UUUU00UU";
-			mems_reg <= "0UUUUUUU";
-			memb_reg <= "00UUUUUU";
+			memc_reg(3 downto 2) <= "00";
+			mems_reg(7) <= '0';
+			memb_reg(7 downto 6) <= "00";
 			dma_state_reg <= "1111";
 			-- dma_wait_reg <= 0;
 
@@ -904,12 +891,8 @@ begin
 			memac_pending_reg <= '0';
 			memac_serviced_reg <= '0';
 			vram_pending_reg <= '0';
-			blitter_addr_reg <= (others => 'U');
 			blitter_irqen_reg <= '0';
-			blitter_vram_data_in_reg <= (others => 'U'); 
 			blitter_pending_reg <= '0';
-			xdl_addr_reg <= (others => 'U');
-			xdl_fetch_reg <= (others => 'U');
 			xdl_enabled_reg <= '0';
 			xdl_pending_reg <= '0';
 			xdl_cmd_reg <= (others => '0');
@@ -971,8 +954,6 @@ begin
 			xdl_char_attr_reg <= (others => '0');
 			xdl_vcount_reg <= 0;
 
-			colmask_reg <= (others => '0');
-			coldetect_reg <= (others => '0');
 		else
 			csel_reg <= csel_next;
 			psel_reg <= psel_next;
@@ -1233,7 +1214,7 @@ process(enable_179,
 	xdl_map_read_reg, xdl_map_fetch_reg, xdl_map_fetch_init_reg, xdl_map_read_count_reg, xdl_map_buffer_data_in_reg, xdl_vdelay_reg,
 	xdl_ov_vcount_reg, xdl_ov_fetch_reg, xdl_ov_fetch_init_reg, xdl_ov_hi_reg, xdl_ov_lo_reg, xdl_pixels_reg,
 	xdl_ptrans_reg, xdl_pixel_buffer_windex_reg, xdl_char_attr_reg, xdl_char_code_reg, no_trans_reg, xdl_vcount_reg, xdl_ov_tlive_reg, vsync, pal,
-	xdl_enabled_reg, xdl_field_end2, xdl_addr_reg, ver_127, turbo)
+	xdl_enabled_reg, gtia_palette_reg, xdl_field_end2, xdl_addr_reg, ver_127, turbo)
 
 variable blitter_notify : boolean := false;
 variable xdl_or_blitter_notify : boolean := false;
@@ -1622,7 +1603,6 @@ begin
 			end if;
 		else
 			if xdl_vdelay_reg = 1 then
-				-- xdl_active_next <= xdl_enabled_reg;
 				xdl_rptl_next <= x"00";
 				xdl_fetch_next <= xdl_addr_reg;
 				xdl_ovscr_h_next <= "000";
@@ -1633,7 +1613,7 @@ begin
 				xdl_map_ht_next <= "00111";
 				xdl_ov_size_next <= "01";
 				xdl_ov_pal_next <= "01";
-				xdl_pf_pal_next <= "00";
+				xdl_pf_pal_next <= gtia_palette_reg;
 				xdl_gp_next <= (others => '1');
 				xdl_cmd_next <= (others => '0');
 				xdl_map_active_next <= '0';
@@ -1663,7 +1643,7 @@ begin
 			when 13 => xdl_mapaddr_next(7 downto 0) <= unsigned(vram_data_in);
 			when 14 => xdl_mapaddr_next(15 downto 8) <= unsigned(vram_data_in);
 			when 15 => xdl_mapaddr_next(18 downto 16) <= unsigned(vram_data_in(2 downto 0));
-			when 16 => xdl_mapaddr_step_next(7 downto 0) <= unsigned(vram_data_in);
+			when 16 => xdl_mapaddr_step_next(7 downto 0) <= unsigned(vram_data_in(7 downto 2))&"00";
 			when 17 => xdl_mapaddr_step_next(11 downto 8) <= unsigned(vram_data_in(3 downto 0));
 			when 18 => xdl_mapscr_h_next <= unsigned(vram_data_in(4 downto 0));
 			when 19 => xdl_mapscr_v_next <= unsigned(vram_data_in(4 downto 0));
@@ -1803,6 +1783,12 @@ begin
 		-- If we are reading, we need to capture the data for the blitter
 		-- on the next cycle
 		blitter_pending_next <= not(blitter_vram_wren);
+	end if;
+
+	if soft_reset = '1' then
+		xdl_active_next <= '0';
+		xdl_ov_active_next <= '0';
+		xdl_map_active_next <= '0';
 	end if;
 
 	if enable_179 = '1' then
