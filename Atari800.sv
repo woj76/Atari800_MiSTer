@@ -139,7 +139,7 @@ localparam CONF_STR = {
 	"P3O[62:61],Interlace hack,Disabled,Weave,Bob;",
 	"P3-;",
 	"P3O[60:59],VBXE,Disabled,$D640,$D740;",
-	"dBP3O[63],VBXE FX version,1.27a,1.26a;",
+	"dBP3O[63],VBXE FX version,1.27,1.26a;",
 	"dBP3O[115],VBXE Blitter,Normal,Turbo;",
 	"dBP3FC2,ACT,VBXE Palette;",
 	"P3-;",
@@ -220,7 +220,7 @@ wire clk_vdo;
 pll pll
 (
 	.refclk(CLK_50M),
-	.rst(0),
+	.rst(1'b0),
 	.outclk_0(clk_sys),
 	.outclk_1(clk_mem),
 	.outclk_2(clk_vdo),
@@ -239,9 +239,9 @@ reg  [31:0] cfg_data;
 pll_cfg pll_cfg
 (
 	.mgmt_clk(CLK_50M),
-	.mgmt_reset(0),
+	.mgmt_reset(1'b0),
 	.mgmt_waitrequest(cfg_waitrequest),
-	.mgmt_read(0),
+	.mgmt_read(1'b0),
 	.mgmt_readdata(),
 	.mgmt_write(cfg_write),
 	.mgmt_address(cfg_address),
@@ -542,7 +542,8 @@ hps_ext hps_ext
 	.emu_cart_trigger(~status[68])
 );
 
-wire [7:0] R,G,B, Ro,Go,Bo;
+wire [31:0] R,G,B;
+wire [7:0] Ro,Go,Bo;
 wire HBlank,VBlank,HBlank_o,VBlank_o;
 wire VSync, HSync, VSync_o, HSync_o;
 wire ce_pix;
@@ -559,8 +560,6 @@ assign AUDIO_S = 1;
 assign AUDIO_MIX = status[4:3];
 
 wire areset;
-
-assign SDRAM_CKE = 1;
 
 wire SIO_MODE = status[16];
 wire SIO_IN,SIO_OUT, SIO_CLKOUT, SIO_CLKIN, SIO_CMD, SIO_PROC, SIO_MOTOR, SIO_IRQ;
@@ -583,11 +582,12 @@ atari800top atari800top
 	.SDRAM_nCS(SDRAM_nCS),
 	.SDRAM_DQMH(SDRAM_DQMH),
 	.SDRAM_DQML(SDRAM_DQML),
+	.SDRAM_CKE(SDRAM_CKE),
 
 	.TURBOFREEZER_ROM_LOADED(turbofreezer_rom_loaded),
 	.SDRAM_READY(sdram_ready),
 	//.OSD_PAUSE(file_download),
-	.OSD_PAUSE(0),
+	.OSD_PAUSE(1'b0),
 	.SET_RESET_IN(set_reset),
 	.SET_PAUSE_IN(set_pause),
 	.SET_FREEZER_IN(set_freezer),
@@ -633,6 +633,7 @@ atari800top atari800top
 	.VGA_G(Go),
 	.VGA_R(Ro),
 	.VGA_PIXCE(ce_pix_raw),
+	.VGA_BLANK(),
 	.interlace_enable(status[62] | status[61]),
 	.interlace(interlace),
 	.interlace_field(interlace_field),
@@ -661,7 +662,7 @@ atari800top atari800top
 	.SIO_MODE(SIO_MODE),
 	.SIO_IN(SIO_IN),
 	.SIO_OUT(SIO_OUT),
-	//.SIO_CLKOUT(SIO_CLKOUT),
+	.SIO_CLKOUT(SIO_CLKOUT),
 	.SIO_CLKIN(SIO_CLKIN),
 	.SIO_CMD(SIO_CMD),
 	.SIO_PROC(SIO_PROC),
@@ -767,7 +768,10 @@ video_mixer #(.GAMMA(1)) video_mixer
 	.scandoubler(~interlace && (scale || forced_scandoubler)),
 	.hq2x(scale==1),
 	.freeze_sync(),
-	.VGA_DE(vga_de)
+	.VGA_DE(vga_de),
+	.R(R[7:0]),
+	.G(G[7:0]),
+	.B(B[7:0])
 );
 
 ////////////////   ROM   ////////////////////
