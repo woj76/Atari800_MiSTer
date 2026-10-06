@@ -1,5 +1,5 @@
 --------------------------------------------------------------------------
--- (c) 2025 Wojciech Mostowski, firstname.lastname at gmail.com
+-- (c) 2026 Wojciech Mostowski, firstname.lastname at gmail.com
 --
 -- The VBXE blitter.
 --
@@ -36,12 +36,9 @@ port (
 	blitter_vram_wren : out std_logic;
 	blitter_vram_data : out std_logic_vector(7 downto 0);
 	blitter_vram_address : out std_logic_vector(18 downto 0);
-
-	-- TODO reset behaviour
 	blitter_status : out std_logic_vector(1 downto 0);
 	blitter_collision : out std_logic_vector(7 downto 0);
 	blitter_irq : out std_logic;
-
 	blitter_irqc : in std_logic
 );
 end VBXE_blitter;
@@ -96,13 +93,9 @@ signal blitter_pattern_count_next : unsigned(5 downto 0);
 signal blitter_next_reg : std_logic;
 signal blitter_next_next : std_logic;
 
---signal blitter_mode_reg : std_logic_vector(2 downto 0);
---signal blitter_mode_next : std_logic_vector(2 downto 0);
 
 signal blitter_mode_reg : integer range 0 to 7;
 signal blitter_mode_next : integer range 0 to 7;
-
-----
 
 signal blitter_ext_next_reg : std_logic;
 signal blitter_ext_next_next : std_logic;
@@ -128,8 +121,6 @@ signal blitter_tsize_x_reg : integer range 3 to 7;
 signal blitter_tsize_x_next : integer range 3 to 7;
 signal blitter_tsize_y_reg : integer range 3 to 7;
 signal blitter_tsize_y_next : integer range 3 to 7;
-
------
 
 signal blitter_load_address_reg : std_logic_vector(18 downto 0);
 signal blitter_load_address_next : std_logic_vector(18 downto 0);
@@ -190,42 +181,11 @@ blitter_irq <= blitter_irq_reg;
 process(clk, reset_n)
 begin
 	if (reset_n = '0') then
-		blitter_src_address_reg <= (others => '0');
-		blitter_src_step_y_reg <= (others => '0');
-		blitter_src_step_x_reg <= (others => '0');
-		blitter_dest_address_reg <= (others => '0');
-		blitter_dest_step_y_reg <= (others => '0');
-		blitter_dest_step_x_reg <= (others => '0');
-		blitter_width_reg <= (others => '0');
-		blitter_height_reg <= (others => '0');
-		blitter_and_mask_reg <= (others => '0');
-		blitter_xor_mask_reg <= (others => '0');
-		blitter_collision_mask_reg <= (others => '0');
-		blitter_zoom_x_reg <= (others => '0');
-		blitter_zoom_y_reg <= (others => '0');
-		blitter_pattern_reg <= '0';
-		blitter_pattern_count_reg <= (others => '0');
-		blitter_next_reg <= '0';
-		blitter_mode_reg <= 0;
-		blitter_aux_reg <= (others => '0');
-
-		blitter_load_address_reg <= (others => '0');
 		blitter_state_reg <= (others => '0');
-
-		blitter_src_current_reg <= (others => '0');
-		blitter_dest_current_reg <= (others => '0');
-
 		blitter_vram_wren_reg <= '0';
 		blitter_vram_data_reg <= (others => '0');
 		blitter_vram_address_reg <= (others => '0');
-		blitter_collision_reg  <= (others => 'U');
 		blitter_irq_reg <= '0';
-		blitter_x_reg <= (others => '0');
-		blitter_y_reg <= (others => '0');
-		blitter_rep_x_reg <= (others => '0');
-		blitter_rep_y_reg <= (others => '0');
-		blitter_pattern_current_reg <= (others => '0');
-		blitter_data_last_reg <= (others => '0');
 	elsif rising_edge(clk) then
 		blitter_src_address_reg <= blitter_src_address_next;
 		blitter_src_step_y_reg <= blitter_src_step_y_next;
@@ -287,8 +247,7 @@ process(soft_reset,
 	blitter_x_reg,blitter_y_reg,blitter_rep_x_reg,blitter_rep_y_reg,blitter_pattern_current_reg,
 	blitter_vram_wren_reg,blitter_data_last_reg,
 	ver_127,blitter_ext_next_reg,blitter_aux_reg,blitter_ext_type_reg,blitter_ext_ctrl_reg,blitter_jump_reg,
-	blitter_rc_src_x_reg,blitter_rc_src_y_reg,blitter_tsize_x_reg,blitter_tsize_y_reg
-)
+	blitter_rc_src_x_reg,blitter_rc_src_y_reg,blitter_tsize_x_reg,blitter_tsize_y_reg)
 	variable source_data : std_logic_vector(7 downto 0);
 	variable blitter_write_destination : boolean;
 	variable blitter_update_state : boolean;
@@ -297,12 +256,9 @@ process(soft_reset,
 	variable blitter_rc_src_x_tmp : unsigned(14 downto 0);
 	variable blitter_rc_src_y_tmp : unsigned(14 downto 0);
 
---	variable texture_addr : std_logic_vector(13 downto 0);
-	type texture_array is array(13 downto 0) of std_logic;
-	variable texture_addr : texture_array;
+	variable texture_addr : std_logic_vector(13 downto 0);
 	variable texture_read : boolean;
---	variable texture_size_x : integer range 3 to 7;
---	variable texture_size_y : integer range 3 to 7;
+	variable next_read_write_check : boolean;
 begin
 
 	blitter_load_address_next <= blitter_load_address_reg;
@@ -354,6 +310,7 @@ begin
 	blitter_data_last_next <= blitter_data_last_reg;
 	
 	if blitter_enable = '1' and blitter_state_reg /= "000000" then
+		next_read_write_check := false;
 		texture_read := false;
 		blitter_rc_src_x_tmp := (others => '0');
 		blitter_rc_src_y_tmp := (others => '0');
@@ -464,12 +421,6 @@ begin
 					blitter_ext_next_next <= '0';
 					blitter_state_next <= "110101";
 				else
-					-- TODO Or waste a cycle and go to "000001" ???
-					-- How does it compare with the original timing in VBXE, can this be tested / measured?
-					-- (with a long chain of blitter blocks?)
-					-- check for the AND mask here does not make too much sense,
-					-- we go to a state where the data is already in anyhow, it would make sense if we
-					-- decided to go to state "000001" first
 					blitter_load_address_next <= blitter_load_address_reg;
 					blitter_collision_next <= X"00";
 					blitter_src_step_y_next(18 downto 13) <= (others => blitter_src_step_y_reg(12));
@@ -519,8 +470,6 @@ begin
 						texture_read := true;
 						blitter_rc_src_x_tmp := blitter_rc_src_x_reg;
 						blitter_rc_src_y_tmp := blitter_rc_src_y_reg;
---						blitter_rc_src_x_next <= blitter_rc_src_x_reg + blitter_src_step_x_reg(14 downto 0);
---						blitter_rc_src_y_next <= blitter_rc_src_y_reg + blitter_src_step_y_reg(14 downto 0);
 					else
 						blitter_src_step_y_next(18 downto 13) <= (others => blitter_src_step_y_reg(12));
 						blitter_vram_address_next <= std_logic_vector(blitter_src_current_reg);
@@ -550,9 +499,6 @@ begin
 						texture_read := true;
 						blitter_rc_src_x_tmp := blitter_rc_src_x_reg;
 						blitter_rc_src_y_tmp := blitter_rc_src_y_reg;
-
-						--blitter_rc_src_x_next <= blitter_rc_src_x_reg + (unsigned(blitter_vram_data_in(6 downto 0))&blitter_src_step_x_reg(7 downto 0));
-						--blitter_rc_src_y_next <= blitter_rc_src_y_reg + blitter_src_step_y_reg(14 downto 0);
 					else
 						blitter_src_step_y_next(18 downto 13) <= (others => blitter_src_step_y_reg(12));
 						blitter_vram_address_next <= std_logic_vector(blitter_src_current_reg);
@@ -578,7 +524,7 @@ begin
 				else
 					blitter_vram_address_next <= std_logic_vector(blitter_src_current_reg);
 				end if;
-			when "00010" -- just actually read the source byte, each time we end up here the raycast source should have been updated
+			when "00010" -- just actually read the source byte
 				| "01010" -- have to restore a previously read byte (x-zoom in progress)
 				| "10010" -- just read the destination byte or additional source byte for modes and configurations that need it
 				=>
@@ -591,8 +537,10 @@ begin
 						-- fresh read or irrelevant because AND mask is 0
 						blitter_data_last_next <= blitter_vram_data_in;
 						source_data := (blitter_vram_data_in and blitter_and_mask_reg) xor blitter_xor_mask_reg;
---						blitter_rc_src_x_next <= blitter_rc_src_x_reg + blitter_src_step_x_reg(14 downto 0);
---						blitter_rc_src_y_next <= blitter_rc_src_y_reg + blitter_src_step_y_reg(14 downto 0);
+						blitter_rc_src_x_tmp := blitter_rc_src_x_reg + blitter_src_step_x_reg(14 downto 0);
+						blitter_rc_src_y_tmp := blitter_rc_src_y_reg + blitter_src_step_y_reg(14 downto 0);
+						blitter_rc_src_x_next <= blitter_rc_src_x_tmp;
+						blitter_rc_src_y_next <= blitter_rc_src_y_tmp;
 					end if;
 					blitter_vram_data_next <= source_data;
 					-- In mode 4 (AND with destination) or in mode 1 with collision mask active, or any other mode
@@ -697,7 +645,7 @@ begin
 							if blitter_ext_type_reg = '0' then
 								if blitter_rep_y_reg = 0 then
 									blitter_src_current_tmp := blitter_src_address_reg + blitter_src_step_y_reg;
-									blitter_src_address_next <= blitter_src_address_reg + blitter_src_step_y_reg;
+									blitter_src_address_next <= blitter_src_current_tmp;
 								else
 									blitter_src_current_tmp := blitter_src_address_reg;
 								end if;
@@ -714,19 +662,7 @@ begin
 							blitter_pattern_current_next <= blitter_pattern_count_reg;
 							blitter_dest_current_next <= blitter_dest_address_reg + blitter_dest_step_y_reg;
 							blitter_dest_address_next <= blitter_dest_address_reg + blitter_dest_step_y_reg;
-							if (not(blitter_write_destination) or (blitter_and_mask_reg = x"00")) then
-								if blitter_and_mask_reg /= x"00" then
-									blitter_vram_wren_next <= '0';
-									if blitter_ext_type_reg = '1' then
-										texture_read := true;
-									else
-										blitter_vram_address_next <= std_logic_vector(blitter_src_current_tmp);
-									end if;
-								end if;
-								blitter_state_next <= "000010";
-							else
-								blitter_state_next <= "000001";
-							end if;
+							next_read_write_check := true;
 						end if;
 					else
 						blitter_dest_current_next <= blitter_dest_current_reg + blitter_dest_step_x_reg;
@@ -747,32 +683,28 @@ begin
 
 							blitter_rep_x_next <= blitter_zoom_x_reg;
 							blitter_x_next <= blitter_x_reg - 1;
-							if (not(blitter_write_destination) or (blitter_and_mask_reg = x"00")) then
-								if blitter_and_mask_reg /= x"00" then
-									blitter_vram_wren_next <= '0';
-									if blitter_ext_type_reg = '1' then
-										texture_read := true;
-									else
-										blitter_vram_address_next <= std_logic_vector(blitter_src_current_tmp);
-									end if;
-								end if;
-								blitter_state_next <= "000010";
-							else
-								blitter_state_next <= "000001";
-							end if;
+							next_read_write_check := true;
 						else
 							blitter_rep_x_next <= blitter_rep_x_reg - 1;
 							-- The data previously read from the source should be restored
 							blitter_state_next <= "001010";
 						end if;
 					end if;
-					if blitter_ext_type_reg = '1' and blitter_rep_x_reg = 0 then
-						blitter_rc_src_x_tmp := blitter_rc_src_x_reg + blitter_src_step_x_reg(14 downto 0);
-						blitter_rc_src_y_tmp := blitter_rc_src_y_reg + blitter_src_step_y_reg(14 downto 0);
-						blitter_rc_src_x_next <= blitter_rc_src_x_tmp;
-						blitter_rc_src_y_next <= blitter_rc_src_y_tmp;
+					if next_read_write_check then
+						if (not(blitter_write_destination) or (blitter_and_mask_reg = x"00")) then
+							if blitter_and_mask_reg /= x"00" then
+								blitter_vram_wren_next <= '0';
+								if blitter_ext_type_reg = '1' then
+									texture_read := true;
+								else
+									blitter_vram_address_next <= std_logic_vector(blitter_src_current_tmp);
+								end if;
+							end if;
+							blitter_state_next <= "000010";
+						else
+							blitter_state_next <= "000001";
+						end if;
 					end if;
-					-- TODO move the common part here
 				end if;
 			when others =>
 			end case;
@@ -788,72 +720,15 @@ begin
 					texture_addr(i+blitter_tsize_x_reg) := blitter_rc_src_y_tmp(8+i);
 				end if;
 			end loop;
-
---			-- TODO CAN THIS BE SIMPLIFIED PLEASE!?
---			case blitter_tsize_x_reg is
---				when 3 =>
---					texture_addr(2 downto 0) := std_logic_vector(blitter_rc_src_x_tmp(10 downto 8));
---					case blitter_tsize_y_reg is
---						when 3 => texture_addr(5 downto 3) := std_logic_vector(blitter_rc_src_y_tmp(10 downto 8));
---						when 4 => texture_addr(6 downto 3) := std_logic_vector(blitter_rc_src_y_tmp(11 downto 8));
---						when 5 => texture_addr(7 downto 3) := std_logic_vector(blitter_rc_src_y_tmp(12 downto 8));
---						when 6 => texture_addr(8 downto 3) := std_logic_vector(blitter_rc_src_y_tmp(13 downto 8));
---						when 7 => texture_addr(9 downto 3) := std_logic_vector(blitter_rc_src_y_tmp(14 downto 8));
---						when others => null;
---					end case;
---				when 4 =>
---					texture_addr(3 downto 0) := std_logic_vector(blitter_rc_src_x_tmp(11 downto 8));
---					case blitter_tsize_y_reg is
---						when 3 => texture_addr(6 downto 4) := std_logic_vector(blitter_rc_src_y_tmp(10 downto 8));
---						when 4 => texture_addr(7 downto 4) := std_logic_vector(blitter_rc_src_y_tmp(11 downto 8));
---						when 5 => texture_addr(8 downto 4) := std_logic_vector(blitter_rc_src_y_tmp(12 downto 8));
---						when 6 => texture_addr(9 downto 4) := std_logic_vector(blitter_rc_src_y_tmp(13 downto 8));
---						when 7 => texture_addr(10 downto 4) := std_logic_vector(blitter_rc_src_y_tmp(14 downto 8));
---						when others => null;
---					end case;
---				when 5 =>
---					texture_addr(4 downto 0) := std_logic_vector(blitter_rc_src_x_tmp(12 downto 8));
---					case blitter_tsize_y_reg is
---						when 3 => texture_addr(7 downto 5) := std_logic_vector(blitter_rc_src_y_tmp(10 downto 8));
---						when 4 => texture_addr(8 downto 5) := std_logic_vector(blitter_rc_src_y_tmp(11 downto 8));
---						when 5 => texture_addr(9 downto 5) := std_logic_vector(blitter_rc_src_y_tmp(12 downto 8));
---						when 6 => texture_addr(10 downto 5) := std_logic_vector(blitter_rc_src_y_tmp(13 downto 8));
---						when 7 => texture_addr(11 downto 5) := std_logic_vector(blitter_rc_src_y_tmp(14 downto 8));
---						when others => null;
---					end case;
---				when 6 =>
---					texture_addr(5 downto 0) := std_logic_vector(blitter_rc_src_x_tmp(13 downto 8));
---					case blitter_tsize_y_reg is
---						when 3 => texture_addr(8 downto 6) := std_logic_vector(blitter_rc_src_y_tmp(10 downto 8));
---						when 4 => texture_addr(9 downto 6) := std_logic_vector(blitter_rc_src_y_tmp(11 downto 8));
---						when 5 => texture_addr(10 downto 6) := std_logic_vector(blitter_rc_src_y_tmp(12 downto 8));
---						when 6 => texture_addr(11 downto 6) := std_logic_vector(blitter_rc_src_y_tmp(13 downto 8));
---						when 7 => texture_addr(12 downto 6) := std_logic_vector(blitter_rc_src_y_tmp(14 downto 8));
---						when others => null;
---					end case;
---				when 7 =>
---					texture_addr(6 downto 0) := std_logic_vector(blitter_rc_src_x_tmp(14 downto 8));
---					case blitter_tsize_y_reg is
---						when 3 => texture_addr(9 downto 7) := std_logic_vector(blitter_rc_src_y_tmp(10 downto 8));
---						when 4 => texture_addr(10 downto 7) := std_logic_vector(blitter_rc_src_y_tmp(11 downto 8));
---						when 5 => texture_addr(11 downto 7) := std_logic_vector(blitter_rc_src_y_tmp(12 downto 8));
---						when 6 => texture_addr(12 downto 7) := std_logic_vector(blitter_rc_src_y_tmp(13 downto 8));
---						when 7 => texture_addr(13 downto 7) := std_logic_vector(blitter_rc_src_y_tmp(14 downto 8));
---						when others => null;
---					end case;
---				when others => null;
---			end case;
-
 			blitter_vram_address_next(18 downto 14) <= std_logic_vector(blitter_src_current_reg(18 downto 14));
---			blitter_vram_address_next(13 downto 6) <= std_logic_vector(blitter_src_current_reg(13 downto 6)) or texture_addr(13 downto 6);
---			blitter_vram_address_next(5 downto 0) <= texture_addr(5 downto 0);
-			blitter_vram_address_next(13 downto 6) <= std_logic_vector(blitter_src_current_reg(13 downto 6)) or std_logic_vector(texture_addr(13 downto 6));
-			blitter_vram_address_next(5 downto 0) <= std_logic_vector(texture_addr(5 downto 0));
+			blitter_vram_address_next(13 downto 6) <= std_logic_vector(blitter_src_current_reg(13 downto 6)) or texture_addr(13 downto 6);
+			blitter_vram_address_next(5 downto 0) <= texture_addr(5 downto 0);
 		end if;
 	end if;
 
 	if ((blitter_stop_request or soft_reset) = '1') then
-		blitter_state_next <= "000000";
+		blitter_state_next <= (others => '0');
+		blitter_vram_wren_next <= '0';
 	elsif blitter_start_request = '1' then
 		blitter_load_address_next <= blitter_address;
 		blitter_state_next <= "111111";
