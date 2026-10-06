@@ -564,6 +564,7 @@ port map (
 	clk => clk,
 	reset_n => reset_n,
 	soft_reset => soft_reset,
+	ver_127 => ver_127,
 	blitter_enable => blitter_enable,
 	blitter_start_request => blitter_request(0),
 	blitter_stop_request => blitter_request(1),
@@ -1204,7 +1205,7 @@ begin
 end process;
 
 -- VBXE DMA state machine
-process(enable_179,
+process(enable_179,soft_reset,
 	dma_state_reg, memac_pending_reg, vram_pending_reg,memac_serviced_reg,memac_request_next,memac_check_a,memac_address,memac_data_in,
 	memc_reg,mems_reg,memb_reg,vram_data_in,vram_request_complete,blitter_vram_address,blitter_vram_data,blitter_vram_wren,blitter_vram_data_in_reg,
 	blitter_status,blitter_pending_reg, xdl_ovscr_h_reg, xdl_ovscr_v_reg,
@@ -1385,11 +1386,6 @@ begin
 						if vram_data_in(3 downto 0) = x"0" then
 							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= not(no_trans_reg);
 						end if;
-					elsif xdl_ov_lo_reg = '1' then
-						xdl_pixels_next(xdl_pixel_buffer_windex_reg+2) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg);
-						xdl_pixels_next(xdl_pixel_buffer_windex_reg+3) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg+1);
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+2) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg);
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg+1);
 					else
 						xdl_pixels_next(xdl_pixel_buffer_windex_reg+2) <= vram_data_in;
 						xdl_pixels_next(xdl_pixel_buffer_windex_reg+3) <= vram_data_in;
@@ -1397,6 +1393,12 @@ begin
 							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+2) <= not(no_trans_reg);
 							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= not(no_trans_reg);
 						end if;
+					end if;
+					if xdl_ov_lo_reg = '1' then
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+2) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg);
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+3) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg+1);
+						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+2) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg);
+						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+3) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg+1);
 					end if;
 				end if;
 			end if;
@@ -1502,11 +1504,6 @@ begin
 						if vram_data_in(3 downto 0) = x"0" then
 							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= not(no_trans_reg);
 						end if;
-					elsif xdl_ov_lo_reg = '1' then
-						xdl_pixels_next(xdl_pixel_buffer_windex_reg+6) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg+4);
-						xdl_pixels_next(xdl_pixel_buffer_windex_reg+7) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg+5);
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+6) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg+4);
-						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg+5);
 					else
 						xdl_pixels_next(xdl_pixel_buffer_windex_reg+6) <= vram_data_in;
 						xdl_pixels_next(xdl_pixel_buffer_windex_reg+7) <= vram_data_in;
@@ -1514,6 +1511,12 @@ begin
 							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+6) <= not(no_trans_reg);
 							xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= not(no_trans_reg);
 						end if;
+					end if;
+					if xdl_ov_lo_reg = '1' then
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+6) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg+4);
+						xdl_pixels_next(xdl_pixel_buffer_windex_reg+7) <= xdl_pixels_reg(xdl_pixel_buffer_windex_reg+5);
+						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+6) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg+4);
+						xdl_ptrans_next(xdl_pixel_buffer_windex_reg+7) <= xdl_ptrans_reg(xdl_pixel_buffer_windex_reg+5);
 					end if;
 					if xdl_pixel_buffer_windex_reg = 8 then
 						xdl_pixel_buffer_windex_next <= 0;
@@ -1690,8 +1693,7 @@ begin
 				xdl_ov_vcount_next <= "111";
 			end if;
 		end if;
-		-- TODO Docs say forbidden for lowres & highres at the same time, but what does it mean? Altirra disables the mode altogether
-		if (xdl_cmd_reg(2) = '1') or ((xdl_cmd_reg(0) and xdl_cmd_reg(1)) = '1') or ((xdl_cmd_reg(12) and xdl_cmd_reg(13)) = '1') then
+		if (xdl_cmd_reg(2) = '1') or ((xdl_cmd_reg(0) and xdl_cmd_reg(1)) = '1') then
 			xdl_ov_active_next <= '0';
 		end if;
 	end if;
